@@ -11,9 +11,9 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 import br.com.tiago.schermack.projeto_teste_automatizado.dto.EmployeeRequestDTO;
 import br.com.tiago.schermack.projeto_teste_automatizado.dto.EmployeeResponseDTO;
@@ -22,12 +22,13 @@ import br.com.tiago.schermack.projeto_teste_automatizado.repository.EmployeeRepo
 import jakarta.persistence.EntityNotFoundException;
 
 @SpringBootTest
-public class EmployeeServiceTest {
+@Transactional
+public class EmployeeServiceIntegrationTest {
 
-    @InjectMocks
+    @Autowired
     private EmployeeService employeeService;
 
-    @Mock
+    @Autowired
     private EmployeeRepository employeeRepository;
 
     @Test
@@ -36,45 +37,34 @@ public class EmployeeServiceTest {
 
         //arrange
         EmployeeRequestDTO requestDTO = new EmployeeRequestDTO("Tiago", "tiago.schermack@gmail.com");
-        Employee employeeSaved = new Employee (requestDTO.firstName(), requestDTO.email());
-        employeeSaved.setId(1L);    
-
-        when(employeeRepository.save(any(Employee.class)))
-            .thenReturn(employeeSaved);
-
+        
         //act
         EmployeeResponseDTO responseDTO = employeeService.create(requestDTO);
-
+        
         //assert
-        assertEquals(1L                       , responseDTO.id        ());
-        assertEquals("Tiago"                    , responseDTO.firstName ());
-        assertEquals("tiago.schermack@gmail.com", responseDTO.email     ());
+        assertEquals("Tiago", responseDTO.firstName());
+        assertEquals("tiago.schermack@gmail.com", responseDTO.email());
 
-        verify(employeeRepository, times(1))
-            .save(any(Employee.class));
     }
 
     @Test
     @DisplayName("Deve atualizar um funcionário e retornar um EmployeeResponseDTO")
     void shouldUpdateEmployeeAndReturnResponseDTO() {
 
-        //arrange
-        EmployeeRequestDTO requestDTO = new EmployeeRequestDTO("Tiago", "tiago.schermack@gmail.com");
-        Employee employeeUpdate = new Employee ("Joao", "joao@gmail.com");
-        employeeUpdate.setId(1L);    
+         //arrange
+        EmployeeRequestDTO requestDTO = 
+            new EmployeeRequestDTO("Tiago", "tiago.schermack@gmail.com");
 
-        when(employeeRepository.findById(employeeUpdate.getId()))
-            .thenReturn(java.util.Optional.of(employeeUpdate));
+        EmployeeResponseDTO createEmployee = 
+            employeeService.create(new EmployeeRequestDTO("João", "João.GG@Gmail.com"));
 
         //act
-        EmployeeResponseDTO responseDTO = employeeService.update(employeeUpdate.getId(), requestDTO);
+        EmployeeResponseDTO responseDTO = employeeService.update(createEmployee.id(), requestDTO);
 
         //assert
-        assertEquals(employeeUpdate.getId()              ,responseDTO.id       ());
-        assertEquals("Tiago"                    , responseDTO.firstName());
-        assertEquals("tiago.schermack@gmail.com", responseDTO.email    ());
-
-        verify(employeeRepository, times(1)).findById(employeeUpdate.getId());
+        assertEquals(createEmployee.id(), responseDTO.id());
+        assertEquals("Tiago", responseDTO.firstName());
+        assertEquals("tiago.schermack@gmail.com", responseDTO.email());
     }
 
     @Test
@@ -82,12 +72,24 @@ public class EmployeeServiceTest {
     void shouldThrowAnErrorWhenTheEmployeeIsNotFoundAndReturnAnEmployeeResponseDTO() {
 
         //arrange
+        EmployeeRequestDTO requestDTO = 
+            new EmployeeRequestDTO("Tiago", "tiago.schermack@gmail.com");
+
+            assertThrows(EntityNotFoundException.class, () -> employeeService.update(666L, requestDTO));
+    }
+
+    @Test
+    @DisplayName("deve deletar um funcionário com sucesso")
+    void shouldDeleteEmployeeSuccessfully() {
+
+        //arrange
         EmployeeRequestDTO requestDTO = new EmployeeRequestDTO("Tiago", "tiago.schermack@gmail.com");
+        
+        //act
+        EmployeeResponseDTO responseDTO = employeeService.create(requestDTO);
+        employeeService.delete(responseDTO.id());
 
-        when(employeeRepository.findById(1L))
-            .thenReturn(Optional.empty());
-
-        //assert-act
-        assertThrows(EntityNotFoundException.class, () -> employeeService.update(1L, requestDTO));
+        //assert
+        assertThrows(EntityNotFoundException.class, () -> employeeService.findById(responseDTO.id()));
     }
 }
